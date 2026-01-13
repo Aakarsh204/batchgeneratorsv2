@@ -1,6 +1,8 @@
+import os
 from typing import Tuple
 import torch
-
+import numpy as np
+import os
 from batchgeneratorsv2.helpers.scalar_type import RandomScalar, sample_scalar
 from batchgeneratorsv2.transforms.base.basic_transform import ImageOnlyTransform
 
@@ -20,7 +22,8 @@ class GaussianNoiseTransform(ImageOnlyTransform):
         c = img.shape[0]
 
         # bool mask on same device as image
-        apply = torch.rand(c, device=img.device) < self.p_per_channel
+        apply_np = np.random.rand(c) < self.p_per_channel
+        apply = torch.from_numpy(apply_np).to(device=img.device)
 
         # store also count / indices to avoid recomputing later
         idx = apply.nonzero(as_tuple=False).flatten()
@@ -52,19 +55,22 @@ class GaussianNoiseTransform(ImageOnlyTransform):
         if sigmas is None:
             return img
 
-        # Create noise only for selected channels
+        # Create noise only for selected channels using NumPy
         if not self.synchronize_channels:
-            # vectorize per-channel sigma by creating a tensor of shape (n, 1, 1, ...)
-            # list->tensor is small (n floats), then broadcast
-            sigma_t = torch.as_tensor(sigmas, device=device, dtype=dtype)
-            view_shape = (n,) + (1,) * len(spatial)
-            sigma_t = sigma_t.view(view_shape)
-
-            noise = torch.empty((n, *spatial), device=device, dtype=dtype).normal_()
-            noise.mul_(sigma_t)
+            # Generate noise per channel with different sigma values
+            noise_shape = (n, *spatial)
+            noise_np = np.random.randn(*noise_shape).astype(np.float32)
+            
+            # Apply per-channel sigma scaling
+            for i, sigma in enumerate(sigmas):
+                noise_np[i] *= sigma
+            
+            noise = torch.from_numpy(noise_np).to(device=device, dtype=dtype)
         else:
             sigma = sigmas
-            noise = torch.empty((n, *spatial), device=device, dtype=dtype).normal_(mean=0.0, std=float(sigma))
+            noise_shape = (n, *spatial)
+            noise_np = np.random.normal(loc=0.0, scale=float(sigma), size=noise_shape).astype(np.float32)
+            noise = torch.from_numpy(noise_np).to(device=device, dtype=dtype)
 
         # In-place add only on selected channels
         img[idx].add_(noise)
