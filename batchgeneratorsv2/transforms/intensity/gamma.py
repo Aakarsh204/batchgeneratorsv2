@@ -1,6 +1,6 @@
 from typing import Optional
 import torch
-
+import numpy as np
 from batchgeneratorsv2.helpers.scalar_type import RandomScalar, sample_scalar
 from batchgeneratorsv2.transforms.base.basic_transform import ImageOnlyTransform
 
@@ -24,17 +24,19 @@ class GammaTransform(ImageOnlyTransform):
         c = img.shape[0]
         device = img.device
         dtype = img.dtype
-
-        apply_idx = (torch.rand(c, device=device) < self.p_per_channel).nonzero(as_tuple=False).flatten()
+        
+        apply_idx_np = np.random.rand(c) < self.p_per_channel
+        apply_idx = torch.from_numpy(apply_idx_np).nonzero(as_tuple=False).flatten()
         n = apply_idx.numel()
         if n == 0:
             return {"apply_to_channel": apply_idx,
                     "retain_stats": None,
                     "invert_image": None,
                     "gamma": None}
-
-        retain_stats = (torch.rand(n, device=device) < self.p_retain_stats)
-        invert_image = (torch.rand(n, device=device) < self.p_invert_image)
+        retain_stats_np = np.random.rand(n) < self.p_retain_stats
+        invert_image_np = np.random.rand(n) < self.p_invert_image
+        retain_stats = torch.from_numpy(retain_stats_np).to(device=device)
+        invert_image = torch.from_numpy(invert_image_np).to(device=device)
 
         if self.synchronize_channels:
             g = float(sample_scalar(self.gamma, image=img, channel=None))
