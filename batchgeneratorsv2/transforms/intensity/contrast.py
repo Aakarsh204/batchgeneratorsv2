@@ -44,7 +44,8 @@ class ContrastTransform(ImageOnlyTransform):
         c = img.shape[0]
 
         # sample on correct device
-        apply_idx = (torch.rand(c, device=img.device) < self.p_per_channel).nonzero(as_tuple=False).flatten()
+        apply_idx_np = np.random.rand(c) < self.p_per_channel
+        apply_idx = torch.from_numpy(apply_idx_np).nonzero(as_tuple=False).flatten()
         n = apply_idx.numel()
 
         if n == 0:
