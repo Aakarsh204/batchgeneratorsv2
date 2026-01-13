@@ -14,7 +14,8 @@ class MultiplicativeBrightnessTransform(ImageOnlyTransform):
 
     def get_parameters(self, **data_dict) -> dict:
         shape = data_dict['image'].shape
-        apply_to_channel = torch.where(torch.rand(shape[0]) < self.p_per_channel)[0]
+        apply_to_channel_np = np.where(np.random.rand(shape[0]) < self.p_per_channel)[0]
+        apply_to_channel = torch.from_numpy(apply_to_channel_np)
         if self.synchronize_channels:
             multipliers = torch.Tensor([sample_scalar(self.multiplier_range, image=data_dict['image'], channel=None)] * len(apply_to_channel))
         else:
@@ -61,17 +62,18 @@ class BrightnessAdditiveTransform(ImageOnlyTransform):
     def get_parameters(self, **data_dict) -> dict:
         img = data_dict["image"]
         c = img.shape[0]
-        apply_to_channel = (torch.rand(c, device=img.device) < self.p_per_channel).nonzero(as_tuple=False).flatten()
-
+        apply_to_channel_np = np.where(np.random.rand(c) < self.p_per_channel)[0]
+        apply_to_channel = torch.from_numpy(apply_to_channel_np).nonzero(as_tuple=False).flatten()
         if len(apply_to_channel) == 0:
             return {"apply_to_channel": apply_to_channel, "shift": None}
 
-        # Apply either synchronized or per-channel brightness shift
+        # Apply either synchronized or per-channel brightness shift using NumPy
         if self.synchronize_channels:
-            shift_value = float(sample_scalar((self.mu, self.sigma), image=img, channel=None))
+            shift_value = float(np.random.normal(self.mu, self.sigma))
             shift = torch.full((c,), shift_value, device=img.device)
         else:
-            shift = torch.stack([torch.normal(self.mu, self.sigma) for _ in range(c)], dim=0).to(img.device)
+            shift_np = np.random.normal(self.mu, self.sigma, size=(c,)).astype(np.float32)
+            shift = torch.from_numpy(shift_np).to(img.device)
 
         return {"apply_to_channel": apply_to_channel, "shift": shift}
 
