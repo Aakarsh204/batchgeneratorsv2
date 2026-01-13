@@ -1,5 +1,5 @@
 from typing import Tuple
-
+import numpy as np
 import torch
 
 from batchgeneratorsv2.helpers.scalar_type import RandomScalar, sample_scalar
@@ -32,9 +32,10 @@ class SimulateLowResolutionTransform(ImageOnlyTransform):
     def get_parameters(self, **data_dict) -> dict:
         shape = data_dict['image'].shape
         if self.allowed_channels is None:
-            apply_to_channel = torch.where(torch.rand(shape[0]) < self.p_per_channel)[0]
+            apply_to_channel_np = np.where(np.random.rand(shape[0]) < self.p_per_channel)[0]
+            apply_to_channel = torch.from_numpy(apply_to_channel_np)
         else:
-            apply_to_channel = [i for i in self.allowed_channels if torch.rand(1) < self.p_per_channel]
+            apply_to_channel = [i for i in self.allowed_channels if np.random.rand() < self.p_per_channel]
         if self.synchronize_channels:
             if self.synchronize_axes:
                 scales = torch.Tensor([[sample_scalar(self.scale, image=data_dict['image'], channel=None, dim=None)] * (len(shape) - 1)] * len(apply_to_channel))
